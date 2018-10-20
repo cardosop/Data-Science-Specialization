@@ -1,0 +1,2 @@
+SELECT COUNT(*) FROM frequency WHERE term LIKE 'law' or 'legal';
+38

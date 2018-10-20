@@ -1,0 +1,129 @@
+---
+title: "Practical Machine Learning Course Project"
+author: "Paulo Cardoso [GitHub](https://github.com/cardosop/Practical-Machine-Learning-Project)"
+date: "March 26, 2016"
+output: pdf_document
+---
+
+# Introduction
+
+Using devices such as JawboneUp, NikeFuelBand, and Fitbitit is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it.
+
+In this project, the goal is to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website: <http://groupware.les.inf.puc-rio.br/har> 
+
+The training data for this project are available here:
+
+<https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv>
+
+The test data are available here:
+
+<https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv>
+
+# Set up
+This first stage the Set UP is characterized by the preparation of the environment and data. Therefore the following steps will be performed:  
+
+- Loading of the libraries that will be used in this project
+
+- Loading the train and test dataset
+
+- Data Cleaning
+
+- Data Slicing
+```{r echo=TRUE, cache=TRUE, warning=FALSE}
+# Loading Libraries
+library(caret)
+library(rpart)
+library(rpart.plot)
+library(randomForest)
+library(corrplot)
+library(data.table)
+``` 
+
+Loading the data.
+```{r echo=TRUE, cache=TRUE}
+# Loading Data
+train = read.csv("pml-training.csv")
+test = read.csv("pml-testing.csv")
+
+# Dimensions
+dim(train)
+dim(test)
+``` 
+The training data set contains 19622 observations and 160 variables, while the testing data set contains 20 observations and 160 variables. The "classe" variable in the training set is the outcome to predict.
+
+```{r echo=TRUE, cache=TRUE}
+# Data Cleaning
+# The First step is the removal od the columns that contain NA values
+trainNA <- train[, colSums(is.na(train)) == 0] 
+testNA <- test[, colSums(is.na(test)) == 0] 
+# The Second step is the removal of some columns that do not contribute to the accelerometer measurements
+classe <- trainNA$classe
+trainRem <- grepl("^X|timestamp|window", names(trainNA))
+trainNA <- trainNA[, !trainRem]
+trainClean <- trainNA[, sapply(trainNA, is.numeric)]
+trainClean$classe <- classe
+testRem <- grepl("^X|timestamp|window", names(testNA))
+testNA <- testNA[, !testRem]
+testClean <- testNA[, sapply(testNA, is.numeric)]
+
+dim(trainClean)
+dim(testClean)
+``` 
+Now, the cleaned training data set contains 19622 observations and 53 variables, while the testing data set contains 20 observations and 53 variables. The "classe" variable is still in the cleaned training set.
+
+```{r echo=TRUE, cache=TRUE}
+# Data Slicing 
+trainPart <- createDataPartition(trainClean$classe, p=0.66, list=F)
+trainData <- trainClean[trainPart, ]
+testData <- trainClean[-trainPart, ]
+``` 
+Then, we can split the cleaned training set into a pure training data set (66%) and a validation data set (34%). We will use the validation data set to conduct cross validation in future steps.
+
+# Data Modeling
+## Model 1: Random Forest
+Regarding the data, we will expect Decision Tree and Random Forest to give the best results. We start with Random Forest. First we set a seed to make this project reproducable. We will use the tuneRF function to calculate the optimal mtry and use that in the random forest function.
+```{r echo=TRUE, cache=TRUE}
+# Seed for reproducibility
+set.seed(12345)
+
+# Finding best mtry
+last <- as.numeric(ncol(trainClean))
+prior <- last - 1
+
+bestmtry <- tuneRF(trainData[-last],trainData$classe, ntreeTry=100, stepFactor=1.5, improve=0.01, trace=TRUE, plot=TRUE, dobest=FALSE)
+mtry <- bestmtry[as.numeric(which.min(bestmtry[,"OOBError"])),"mtry"]
+
+# Random Forest
+trainRF <- randomForest(classe~.,data=trainData, mtry=mtry, ntree=501, keep.forest=TRUE, proximity=TRUE, importance=TRUE,test=testData)
+
+# Accuracy for trainData
+pred1Model1 <- predict(trainRF, newdata=trainData)
+confusionMatrix(pred1Model1,trainData$classe)
+
+# Accuracy for testData
+pred2Model1 <- predict(trainRF, newdata=testData)
+confusionMatrix(pred2Model1,testData$classe)
+``` 
+Here we use Model 1 to predict both the training as the testing set. With the test set, we obtain an accuracy of 0.9946, which seems to be acceptable. However, we will also test the Decision Tree model.
+
+## Model 2: Decision Tree
+```{r echo=TRUE, cache=TRUE}
+# Model 2: Decision Tree
+trainDT <- rpart(classe ~ ., data=trainData, method="class")
+
+# Ploting Tree
+prp(trainDT)
+
+# Cross Validation
+predModel2 <- predict(trainDT, testData, type = "class")
+confusionMatrix(predModel2, testData$classe)
+```
+As we can see, this model is not improving the performance, having an accuracy of 0.7323. Therefor, we will continue with model 1.
+
+# Results
+Finally, as the Random Forest model gave us the best result, we will apply that to our validation set and create the documents to submit.
+```{r echo=TRUE, cache=TRUE}
+# Predict the class of the validation set
+result<-predict(trainRF, testClean[, -length(names(testClean))])
+result
+```

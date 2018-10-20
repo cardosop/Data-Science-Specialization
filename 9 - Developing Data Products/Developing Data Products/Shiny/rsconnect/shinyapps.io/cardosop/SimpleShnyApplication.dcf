@@ -1,0 +1,9 @@
+name: SimpleShnyApplication
+account: cardosop
+server: shinyapps.io
+appId: 96243
+bundleId: 426678
+url: https://cardosop.shinyapps.io/SimpleShnyApplication/
+when: 1461177256.8219
+asMultiple: FALSE
+asStatic: FALSE

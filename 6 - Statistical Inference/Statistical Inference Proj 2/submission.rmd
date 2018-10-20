@@ -1,0 +1,110 @@
+---
+title: "Statistical Inference Project Part 2"
+author: "Paulo Cardoso"
+date: "January 28, 2016"
+output: pdf_document
+---
+
+# Overview
+
+This is the second part of Statistical Inference class project that aims to perform a basic inferential analyses utilizing the ThoothGrowth data of the R datasets package.The dataset is compose by 60 observations, length of odontoblasts (teeth) in each of 10 guinea pigs at each of three dose levels of Vitamin C (0.5, 1 and 2 mg) with each of two delivery methods (orange juice or ascorbic acid).
+
+# Set up
+
+Loading the external libraries and the data.
+```{r echo=TRUE, cache=TRUE}
+# Loading libraries
+library(datasets)
+library(lattice)
+
+# Loading the data
+data(ToothGrowth)
+``` 
+
+# Exploratory Data Analyses
+
+In order to understand the data set is necessary that a few metrics be presented.
+
+I)Presenting the struture of the dataset.
+```{r echo=TRUE, cache=TRUE}
+# Struture presentation
+str(ToothGrowth)
+``` 
+II)Display the amount of rows.
+```{r echo=TRUE, cache=TRUE}
+# Number of rows
+nrow(ToothGrowth)
+```
+III)Display the first six rows.
+```{r echo=TRUE, cache=TRUE}
+# Head of the dataset
+head(ToothGrowth)
+```
+IV)Display the last six rows.
+```{r echo=TRUE, cache=TRUE}
+# Tail of the dataset
+tail(ToothGrowth)
+```
+V) Presenting the summary of the dataset.
+```{r echo=TRUE, cache=TRUE}
+# Summary
+summary(ToothGrowth)
+```
+VI) Scatterplot showing every single value, and a boxplot chart summarizing the dataset.
+```{r echo=TRUE, cache=TRUE}
+# Scatterplot
+xyplot(len~dose|supp, ToothGrowth,
+       main="Scatterplots of type of supplement and dose",
+       ylab="Length", xlab="Dose")
+```
+VII) Boxplot representing the tooth length by dose, on that way comparing the two delivery methods.And also a basic summary of each delivery method
+```{r echo=TRUE, cache=TRUE}
+# Separating the two diferent delivery methods
+oj <- levels(ToothGrowth$supp)[1]
+vc <- levels(ToothGrowth$supp)[2]
+
+# Boxplot
+par(mfrow = c(1, 2))
+boxplot(len ~ dose, 
+        ToothGrowth[ToothGrowth$supp == oj,], 
+        main="OJ", 
+        xlab="Dose", 
+        ylab="Tooth Length", 
+        ylim=range(0,35))
+boxplot(len ~ dose, 
+        ToothGrowth[ToothGrowth$supp == vc,], 
+        main="VC", 
+        xlab="Dose", 
+        ylab="Tooth Length", 
+        ylim=range(0,35))
+
+# Summary from Orange Juice
+summary(ToothGrowth[ToothGrowth$supp == oj,])
+
+# Summary from Ascorbic Acid
+summary(ToothGrowth[ToothGrowth$supp == vc,])
+```
+
+# Inferential Statistics
+
+Do the tooth length of the guinea pigs depends on delivery methods?
+To analyze tooth growth, we carry out two-sample (orange juice vs. ascorbic acid) T-tests at each dosage level.
+
+The T-test at 0.5 mg yields the following:
+```{r echo=TRUE, cache=TRUE}
+t.test(len ~ supp, ToothGrowth[ToothGrowth$dose == .5, ])
+```
+
+The T-test at 1 mg yields the following:
+```{r echo=TRUE, cache=TRUE}
+t.test(len ~ supp, ToothGrowth[ToothGrowth$dose == 1, ])
+```
+
+The T-test at 2 mg yields the following:
+```{r echo=TRUE, cache=TRUE}
+t.test(len ~ supp, ToothGrowth[ToothGrowth$dose == 2, ])
+```
+
+# Conclusion
+
+From the T test performed above it can be concluded that from statistical significance p-value that the dosages of 0.5 mg and 1 mg of orange juice is more effective. Thus promoting greater dental growth that ascorbic acid. Analyzing the p-value of 2 mg can not be concluded that orange juice promotes dental growth more effectively than ascorbic acid.

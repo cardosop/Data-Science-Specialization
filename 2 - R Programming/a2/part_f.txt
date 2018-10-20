@@ -1,0 +1,10 @@
+SELECT count(*)
+FROM (
+SELECT COUNT(DISTINCT docid)
+FROM "Frequency"
+WHERE term IN ("transactions", "world")
+GROUP BY docid
+HAVING COUNT(DISTINCT term) = 2
+);
+
+3

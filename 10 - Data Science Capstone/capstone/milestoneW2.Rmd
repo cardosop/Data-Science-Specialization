@@ -1,0 +1,262 @@
+---
+title: "Milestone Week 2 - Data Science Capstone Project"
+author: "Paulo Cardoso"
+date: "May 1, 2016"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, cache=TRUE, eval = TRUE, results = 'hold')
+options(scipen = 1)
+suppressMessages(library(knitr, warn.conflicts = FALSE, quietly=TRUE)) 
+suppressMessages(library(stringi, warn.conflicts = FALSE, quietly=TRUE))
+suppressMessages(library(ggplot2, warn.conflicts = FALSE, quietly=TRUE))
+suppressMessages(library(gridExtra,warn.conflicts = FALSE, quietly=TRUE))
+suppressMessages(library(tm, warn.conflicts = FALSE, quietly=TRUE))
+suppressMessages(library(wordcloud, warn.conflicts = FALSE, quietly=TRUE))
+suppressMessages(library(RWeka, warn.conflicts = FALSE, quietly=TRUE))
+```
+
+# Executive Summary
+
+This milestone report is for the Coursera Data Science Capstone project. Which aims to explain the preprocessing method of data employed and the exploratory data analysis performed. The data used are from the data packet provided by the course organizer and from the provided data files that have been used are:
+
+- Blog "./data/Coursera-SwiftKey/final/en_US/en_US.blogs.txt"
+
+- News "./data/Coursera-SwiftKey/final/en_US/en_US.news.txt"
+
+- Twitter "./data/Coursera-SwiftKey/final/en_US/en_US.twitter.txt"
+
+The Data used on this project can be found on: <https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip>
+
+# Input Data And Setting Up
+Downloading the Data through R and unzipping 
+```{r}
+# Remove # commentary tag
+#URL <- "https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip"
+#download.file(URL,destfile = "Coursera-SwiftKey.zip")
+#unzip(zipfile = "Coursera-SwiftKey.zip")
+```
+Setting Work Directory
+```{r}
+# Remove # commentary tag
+#setwd("./final/en_US")
+```
+Loading the data into Variables
+```{r}
+blogsRaw <- readLines("en_US.blogs.txt", encoding = "UTF-8", skipNul=TRUE)
+newsRaw <- readLines("en_US.news.txt", encoding = "UTF-8", skipNul=TRUE)
+twitterRaw <- readLines("en_US.twitter.txt", encoding = "UTF-8", skipNul=TRUE)
+```
+Loading Libraries
+```{r}
+library(stringi)
+library(ggplot2)
+library(gridExtra)
+library(tm)
+library(wordcloud)
+library(RWeka)
+```
+
+# Getting and Cleaning the Data
+The goal of this task is to get familiar with the databases and do the necessary cleaning. In order to be able to accomplish this it is necessary to performing the following steps:
+
+- Sampling
+```{r}
+# Random seed
+set.seed(1234)
+# Sampling
+blogsSample <- sample(blogsRaw,size =  0.05*length(blogsRaw),replace = FALSE)
+newsSample <- sample(newsRaw,size =  0.05*length(newsRaw),replace = FALSE)
+twitterSample <- sample(twitterRaw,size =  0.05*length(twitterRaw),replace = FALSE)
+# Merging Samples
+dataSample <- paste0(c(blogsSample, newsSample,twitterSample))
+```
+
+- Profanity filtering and Data cleaning
+
+The list of profanity words used on this project can be found on: <http://www.freewebheaders.com/full-list-of-bad-words-banned-by-google/>
+```{r}
+# Creating Corpus
+dataSample <- iconv(dataSample, "latin1", "ASCII", sub="")
+dataCorpus <- Corpus(VectorSource(list(dataSample)))
+# Setting up bad words
+badWords <- read.csv("badwords.txt")
+badWords <- as.vector(t(badWords))
+# Cleaning data and removing profanity
+dataCorpus <- tm_map(dataCorpus, content_transformer(tolower))
+dataCorpus <- tm_map(dataCorpus, content_transformer(removePunctuation))
+dataCorpus <- tm_map(dataCorpus, content_transformer(removeNumbers))
+dataCorpus <- tm_map(dataCorpus, stripWhitespace)
+dataCorpus <- tm_map(dataCorpus, removeWords, stopwords("english"))
+dataCorpus <- tm_map(dataCorpus, removeWords, badWords)
+dataCorpus <- tm_map(dataCorpus, stemDocument, language='english')
+```
+
+- Tokenization
+```{r}
+# tokenizer function
+tUni <- function(x) NGramTokenizer(x, Weka_control(min = 1, max = 1))
+tBi <- function(x) NGramTokenizer(x, Weka_control(min = 2, max = 2))
+tTri <- function(x) NGramTokenizer(x, Weka_control(min = 3, max = 3))
+# Tokenizing
+uniMat <- TermDocumentMatrix(dataCorpus, control = list(tokenize = tUni))
+biMat <- TermDocumentMatrix(dataCorpus, control = list(tokenize = tBi))
+triMat <- TermDocumentMatrix(dataCorpus, control = list(tokenize = tTri))
+```
+
+# Summary Statistics
+- Basic Stats
+```{r}
+# General String Statistics
+blogsStat <- as.data.frame(stri_stats_general(blogsRaw))
+newsStat <- as.data.frame(stri_stats_general(newsRaw))
+twitterStat <- as.data.frame(stri_stats_general(twitterRaw))
+dataStat <- cbind(blogsStat,newsStat,twitterStat)
+colnames(dataStat)<-c("Blogs","News","Tweets")
+head(format(as.data.frame(dataStat),big.mark=",",scientific=F))
+# Distribution of words per line
+blogsNrow <- stri_count_words(blogsRaw)
+newsNrow <- stri_count_words(newsRaw)
+twitterNrow <- stri_count_words(twitterRaw)
+blogsSumm <- summary(blogsNrow)
+newsSumm <- summary(newsNrow)
+twitterSumm <- summary(twitterNrow)
+dataSumm <- cbind(blogsSumm,newsSumm,twitterSumm)
+colnames(dataSumm)<-c("Blogs","News","Tweets")
+head(format(as.data.frame(dataSumm),big.mark=",",scientific=F))
+```
+
+- Histograms of word frequency
+
+```{r echo=FALSE}
+# Histograms
+blogsPlot <- qplot(blogsNrow, geom="histogram",binwidth = 60) 
+blogsPlot <- blogsPlot + xlab("Blogs") + ylab("Word Count")
+newsPlot <- qplot(newsNrow, geom="histogram",binwidth = 20)
+newsPlot <- newsPlot + xlab("News") + ylab("Word Count")
+twitterPlot <- qplot(twitterNrow, geom="histogram",binwidth = 1)
+twitterPlot <- twitterPlot + xlab("Tweets") + ylab("Word Count")
+grid.arrange(blogsPlot,newsPlot,twitterPlot, ncol=3)
+```
+
+## Unigram
+- Ploting frequency of words on unigram
+```{r}
+freqOFterm <- findFreqTerms(uniMat, lowfreq = 1000)
+termOFfreq <- rowSums(as.matrix(uniMat[freqOFterm,]))
+termOFfreq <- data.frame(unigram=names(termOFfreq), frequency=termOFfreq)
+termOFfreq[1:20,]
+
+uniPlot <- ggplot(termOFfreq[1:20,], aes(x=reorder(unigram, frequency), y=frequency)) +
+  geom_bar(stat = "identity", fill = "orange") +  coord_flip() +
+  theme(legend.title=element_blank()) +
+  xlab("Unigram") + ylab("Frequency") +
+  labs(title = "Top 20 Unigrams by Frequency")
+print(uniPlot)
+```
+
+- Amount of words needed to cover 50% of the instances in Unigram
+```{r}
+uniSum <- cumsum(termOFfreq$frequency)
+uni50 <- sum(termOFfreq$frequency)*0.5
+length((uniSum[uniSum <=  uni50]))
+```
+
+- Amount of words to cover 90% of the instances in Unigram
+```{r}
+uni90 <- sum(termOFfreq$frequency)*0.9
+length((uniSum[uniSum <=  uni90]))
+```
+
+- Unigram WorldCloud
+```{r}
+uniSort <- as.matrix(uniMat)
+uniSort <- sort(rowSums(uniSort),decreasing=TRUE)
+uni20 <- data.frame(word = names(uniSort),freq=uniSort)
+
+wordcloud(uni20$word,uni20$freq, scale=c(4,.3),min.freq=2,max.words=50, random.order=F, rot.per=.15, colors=brewer.pal(8,"Dark2"))
+```
+
+## Bigram
+- Ploting frequency of words on bigram
+```{r}
+freqOFterm <- findFreqTerms(biMat, lowfreq = 100)
+termOFfreq <- rowSums(as.matrix(biMat[freqOFterm,]))
+termOFfreq <- data.frame(bigram=names(termOFfreq), frequency=termOFfreq)
+termOFfreq[1:20,]
+
+biPlot <- ggplot(termOFfreq[1:20,], aes(x=reorder(bigram, frequency), y=frequency)) +
+  geom_bar(stat = "identity", fill = "orange") +  coord_flip() +
+  theme(legend.title=element_blank()) +
+  xlab("Bigram") + ylab("Frequency") +
+  labs(title = "Top 20 Bigrams by Frequency")
+print(biPlot)
+```
+
+- Amount of words needed to cover 50% of the instances in bigram
+```{r}
+biSum <- cumsum(termOFfreq$frequency)
+bi50 <- sum(termOFfreq$frequency)*0.5
+length((biSum[biSum <=  bi50]))
+```
+
+- Amount of words to cover 90% of the instances in bigram
+```{r}
+bi90 <- sum(termOFfreq$frequency)*0.9
+length((biSum[biSum <=  bi90]))
+```
+
+- Bigram WorldCloud
+```{r}
+biSort <- as.matrix(biMat)
+biSort <- sort(rowSums(biSort),decreasing=TRUE)
+bi20 <- data.frame(word = names(biSort),freq=biSort)
+
+wordcloud(bi20$word,bi20$freq, scale=c(4,.3),min.freq=2,max.words=50, random.order=F, rot.per=.15, colors=brewer.pal(8,"Dark2"))
+```
+
+## Trigram
+- Ploting frequency of words on trigram
+```{r}
+freqOFterm <- findFreqTerms(triMat, lowfreq = 25)
+termOFfreq <- rowSums(as.matrix(triMat[freqOFterm,]))
+termOFfreq <- data.frame(trigram=names(termOFfreq), frequency=termOFfreq)
+termOFfreq[1:20,]
+
+triPlot <- ggplot(termOFfreq[1:20,], aes(x=reorder(trigram, frequency), y=frequency)) +
+  geom_bar(stat = "identity", fill = "orange") +  coord_flip() +
+  theme(legend.title=element_blank()) +
+  xlab("Bigram") + ylab("Frequency") +
+  labs(title = "Top 20 Bigrams by Frequency")
+print(triPlot)
+```
+
+- Amount of words needed to cover 50% of the instances in trigram
+```{r}
+triSum <- cumsum(termOFfreq$frequency)
+tri50 <- sum(termOFfreq$frequency)*0.5
+length((triSum[triSum <=  tri50]))
+```
+
+- Amount of words to cover 90% of the instances in trigram
+```{r}
+tri90 <- sum(termOFfreq$frequency)*0.9
+length((triSum[triSum <=  tri90]))
+```
+
+- Trigram WorldCloud
+```{r}
+triSort <- as.matrix(triMat)
+triSort <- sort(rowSums(triSort),decreasing=TRUE)
+tri20 <- data.frame(word = names(triSort),freq=triSort)
+
+wordcloud(tri20$word,tri20$freq, scale=c(4,.3),min.freq=2,max.words=50, random.order=F, rot.per=.15, colors=brewer.pal(8,"Dark2"))
+```
+
+# Findings
+The set of files used in this project has a considerable size around 500Mb. This taking into account that will be analyzed in personal computers. Because the processing of the file size becomes a time-consuming task and because of that for the realization of the project the option to use a sample of the data became necessary. What one hand improves processing performance, but on the other hand reduces the accuracy.
+Removing all stopwords from the corpus is recommended, but, of course, stopwords are a fundamental part of languages. Therefore, consideration should be given to include these stop words in the prediction application again. And The line size differ dramatically between blogs/news and twitter data, though file sizes are comparable.
+
+# Probable next steps of the Capstone Project
+I believe that the objective of this project is to create a prediction application. And for this it is necessary to develop a reliable application, fast and light.

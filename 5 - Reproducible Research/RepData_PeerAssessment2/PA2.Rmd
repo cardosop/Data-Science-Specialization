@@ -1,0 +1,92 @@
+---
+title: "Impacts on the economy and public health by severe weather events in the US"
+author: "Paulo Cardoso"
+date: "December 23, 2015"
+output: html_document
+---
+
+## Set up
+
+```{r echo=TRUE}
+options(scipen = 1)  # remove scientific notations
+```
+
+##Synopsis
+This work aims to carry out an analysis of the impacts of extreme climatic events on the economy and public health in the United States. The data used in this analysis are data collected by the US National Oceanic and Atmospheric Administration's (NOAA) and cover the 1950 period - 2011. In this the variables data set taken into consideration in this analysis can be cited: fatalities, injuries and property damage (in US dollars).The data used is available here (https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2) and the documenation if available here (https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2Fpd01016005curr.pdf)
+
+## Data Processing
+
+This section consists of the loading of data and its preprocessing, going through a quick exploratorioa analysis of data in order to conceptualize the dataset, thus providing the presentation of the variables utilized in the study.
+
+### Data Load
+After downloading the data by the link provided above, the data is loaded into the variable Datastorm.
+```{r echo=TRUE, cache=TRUE}
+dataStorm <- read.csv(bzfile("repdata_data_StormData.csv.bz2"))
+```
+### Exploratory Data Analisys 
+As can be seen below the dataset has 902,297 rows and 37 columns, and is also available a sample of the dataset.
+```{r echo=TRUE}
+dim(dataStorm)
+
+head(dataStorm, n = 3)
+```
+As can be noted in the histogram, the frequency distribution of the data inputs have a higher intensity of the late '90s to now.
+```{r echo=TRUE}
+if (dim(dataStorm)[2] == 37) {dataStorm$year <- as.numeric(format(as.Date(dataStorm$BGN_DATE, format = "%m/%d/%Y %H:%M:%S"), "%Y")) }
+hist(dataStorm$year, breaks = 30, col = "gray")
+```
+Normalizing names of events.
+```{r echo=TRUE}
+x <- dataStorm[,c("EVTYPE", "FATALITIES", "INJURIES", "PROPDMG")]
+
+x$EVTYPE <- gsub("^HEAT$", "EXCESSIVE HEAT", x$EVTYPE)
+x$EVTYPE <- gsub("^TSTM WIND$", "THUNDERSTORM WIND", x$EVTYPE)
+x$EVTYPE <- gsub("^THUNDERSTORM WIND$", "THUNDERSTORM WINDS", x$EVTYPE)
+```
+Aggregating the top 10 fatalities causes.
+```{r echo=TRUE}
+fatal<-	aggregate(x$FATALITIES, by=list(x$EVTYPE), FUN=sum, na.rm=TRUE)
+colnames(fatal) = c("event.type", "fatality.total")
+f <- fatal[order(-fatal$fatality.total),] 
+t10fatal <- f[1:10,]
+t10fatal$event.type <- factor(t10fatal$event.type, levels = t10fatal$event.type, ordered=TRUE)
+t10fatal
+```
+Aggregating the top 10 injuries causes.
+```{r echo=TRUE}
+injur<- aggregate(x$INJURIES, by=list(x$EVTYPE), FUN=sum, na.rm=TRUE)
+colnames(injur) = c("event.type", "injury.total")
+injuries.sorted <- injur[order(-injur$injury.total),] 
+t10inj <- injuries.sorted[1:10,]
+t10inj$event.type <- factor(t10inj$event.type, levels=t10inj$event.type, ordered=TRUE)
+t10inj
+```
+Aggregating the top 10 property damage causes.
+```{r echo=TRUE}
+propdmg <- aggregate( x$PROPDMG, by=list(x$EVTYPE), FUN=sum, na.rm=TRUE)
+colnames(propdmg) = c("event.type", "prop.dmg.total")
+prop.dmg.sorted <- propdmg[order(-propdmg$prop.dmg.total),] 
+t10pd <- prop.dmg.sorted[1:10,]
+t10pd$event.type <- factor(t10pd$event.type, levels=t10pd$event.type, ordered=TRUE)
+t10pd
+```
+
+## Results
+The damages in the area of public health are the following:
+```{r echo=TRUE}
+library(ggplot2)
+ggplot(data=t10fatal, aes(x=event.type, y=fatality.total)) + 
+    geom_bar(stat="identity") + xlab("Event type") + ylab("Total fatalities") + 
+    ggtitle("Fatalities By Event Type") +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+ggplot(data=t10inj, aes(x=event.type, y=injury.total)) + 
+    geom_bar(stat="identity") + xlab("Event type") + ylab("Total injuries") + 
+    ggtitle("Injuries By Event Type") +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+Finally the economic damage are:
+```{r echo=TRUE}
+ggplot(data=t10pd, aes(x=event.type, y=prop.dmg.total)) + 
+    geom_bar(stat="identity") + xlab("Event type") + ylab("Total property damage") +  ggtitle("Property Damage By Event Type") + 
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```

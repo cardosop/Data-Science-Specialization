@@ -1,0 +1,101 @@
+---
+title: "Reproducible Research: Peer Assessment 1"
+output: 
+  html_document:
+    keep_md: treu
+---
+
+
+## Loading and preprocessing the data
+
+```{r echo=TRUE}
+unzip("activity.zip")
+data <- read.csv("activity.csv")
+str(data)
+```
+
+```{r echo=TRUE}
+head(data)
+```
+
+```{r echo=TRUE}
+summary(data)
+```
+
+## What is mean total number of steps taken per day?
+Histogram of the sum of steps taken each day
+
+```{r echo=TRUE}
+meanStepDay <- aggregate(steps ~ date, data = data, sum, na.rm = TRUE)
+```
+Mean of the sum of steps taken per day
+```{r echo=TRUE}
+mean(meanStepDay$steps)
+```
+Median of the sum of steps taken per day
+```{r echo=TRUE}
+median(meanStepDay$steps)
+```
+
+## What is the average daily activity pattern?
+Plot of the time series of the average daily steps, with in 5-minute interval.
+```{r echo=TRUE}
+avStepInt<- aggregate(steps ~ interval, data, mean)
+plot(avStepInt, type='l', col="orange")
+```
+Interval and average of the highest count of steps
+```{r echo=TRUE}
+avStepInt[which.max(avStepInt$steps),]
+```
+
+## Imputing missing values
+Sum of the Na values on data
+```{r echo=TRUE}
+sum(is.na(data))
+```
+Sum of the Na values on data$steps
+```{r echo=TRUE}
+sum(is.na(data$steps))
+```
+Both have the same amount of NAs, which leading to the conclusion that all NAs values are from the column steps.
+
+In order to fix the problem NA values, will be applied a method of replacement of NA values, for a value corresponding to an average of 5 minute intervals with the removal of NAs.
+```{r echo=TRUE}
+newData <- data
+nas <- is.na(newData$steps)
+temp <- tapply(newData$steps, newData$interval, mean, na.rm=TRUE, simplify=TRUE)
+newData$steps[nas] <- temp[as.character(newData$interval[nas])]
+```
+Histogram
+```{r echo=TRUE}
+newAvgStepInt <- aggregate(steps ~ date, data = newData, FUN = sum)
+barplot(newAvgStepInt$steps, names.arg = newAvgStepInt$date, xlab = "date", ylab = "steps", col="orange")
+```
+Mean
+```{r echo=TRUE}
+mean(newAvgStepInt$steps)
+```
+Median
+```{r echo=TRUE}
+median(newAvgStepInt$steps)
+```
+
+## Are there differences in activity patterns between weekdays and weekends?
+Adding variable dType that is if the day is a weekday or a weekend.
+```{r echo=TRUE}
+dType <- function(date) {
+    if (weekdays(as.Date(date)) %in% c("Saturday", "Sunday")) {
+        "weekend"
+    } else {
+        "weekday"
+    }
+}
+newData$dType <- as.factor(sapply(newData$date, dType))
+```
+Plotting the averages of weekdays and weekend days
+```{r echo=TRUE}
+library(lattice)
+
+stepInt <- aggregate(steps ~ interval + dType, newData, mean)
+xyplot(steps ~ interval | dType, data=stepInt, layout=c(2,1), type='l',col="orange")
+```
